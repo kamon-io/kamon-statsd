@@ -25,7 +25,6 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.Config
 import kamon.metric.MeasurementUnit.Dimension.{Information, Time}
-import kamon.metric.MeasurementUnit.{information, time}
 import kamon.metric.{MeasurementUnit, _}
 import kamon.util.DynamicAccess
 import kamon.{Kamon, MetricReporter}
@@ -59,7 +58,7 @@ class StatsDReporter extends MetricReporter  {
       logger.warn("Unable to reload configuration.")
   }
 
-  override def reportTickSnapshot(snapshot: TickSnapshot): Unit = {
+  override def reportPeriodSnapshot(snapshot: PeriodSnapshot): Unit = {
     val config = configuration.get()
     val keyGenerator = config.keyGenerator
     val clientChannel = DatagramChannel.open()
@@ -67,36 +66,36 @@ class StatsDReporter extends MetricReporter  {
     val packetBuffer = new MetricDataPacketBuffer(config.maxPacketSize, clientChannel, config.agentAddress)
 
     for (counter <- snapshot.metrics.counters) {
-      packetBuffer.appendMeasurement(keyGenerator.generateKey(counter.name, counter.tags), encodeStatsDCounter(counter.value, counter.unit))
+      packetBuffer.appendMeasurement(keyGenerator.generateKey(counter.name, counter.tags), encodeStatsDCounter(config, counter.value, counter.unit))
     }
 
     for (gauge <- snapshot.metrics.gauges) {
-      packetBuffer.appendMeasurement(keyGenerator.generateKey(gauge.name, gauge.tags), encodeStatsDGauge(gauge.value, gauge.unit))
+      packetBuffer.appendMeasurement(keyGenerator.generateKey(gauge.name, gauge.tags), encodeStatsDGauge(config, gauge.value, gauge.unit))
     }
 
-    for (metric <- snapshot.metrics.histograms ++ snapshot.metrics.minMaxCounters;
+    for (metric <- snapshot.metrics.histograms ++ snapshot.metrics.rangeSamplers;
          bucket <- metric.distribution.bucketsIterator) {
 
-      val bucketData = encodeStatsDTimer(bucket.value, bucket.frequency, metric.unit)
+      val bucketData = encodeStatsDTimer(config, bucket.value, bucket.frequency, metric.unit)
       packetBuffer.appendMeasurement(keyGenerator.generateKey(metric.name, metric.tags), bucketData)
     }
 
     packetBuffer.flush()
   }
 
-
-  private def encodeStatsDTimer(level: Long, count: Long, unit: MeasurementUnit): String = {
+  private def encodeStatsDTimer(config: Configuration, level: Long, count: Long, unit: MeasurementUnit): String = {
     val samplingRate: Double = 1D / count
-    s"${scale(level, unit)}|ms${if (samplingRate != 1D) "|@" + samplingRateFormat.format(samplingRate) else ""}"
+    val sampled = if (samplingRate != 1D) "|@" + samplingRateFormat.format(samplingRate) else ""
+    s"${scale(config, level, unit)}|ms$sampled"
   }
 
-  private def encodeStatsDCounter(count: Long, unit: MeasurementUnit): String = s"${scale(count, unit)}|c"
+  private def encodeStatsDCounter(config: Configuration, count: Long, unit: MeasurementUnit): String = s"${scale(config, count, unit)}|c"
 
-  private def encodeStatsDGauge(value:Long, unit: MeasurementUnit): String = s"${scale(value, unit)}|g"
+  private def encodeStatsDGauge(config: Configuration, value: Long, unit: MeasurementUnit): String = s"${scale(config, value, unit)}|g"
 
-  private def scale(value: Long, unit: MeasurementUnit): Double = unit.dimension match {
-    case Time         if unit.magnitude != time.seconds       => MeasurementUnit.scale(value, unit, time.seconds)
-    case Information  if unit.magnitude != information.bytes  => MeasurementUnit.scale(value, unit, information.bytes)
+  private def scale(config: Configuration, value: Long, unit: MeasurementUnit): Double = unit.dimension match {
+    case Time         => MeasurementUnit.scale(value, unit, config.timeUnit)
+    case Information  => MeasurementUnit.scale(value, unit, config.informationUnit)
     case _ => value
   }
 

@@ -44,8 +44,9 @@ class SimpleMetricKeyGenerator(config: Config) extends MetricKeyGenerator {
     else application
 
   def generateKey(name: String, tags: Map[String, String]): String = {
-    val stringTags = TreeMap(tags.toSeq:_ *).values.map(normalizer).mkString(".")
-    s"$baseName.${normalizer(name)}.$stringTags"
+    val sortedNormalizedTags = TreeMap(tags.toSeq:_ *).values.map(normalizer).toList
+    val parts = baseName :: normalizer(name) :: sortedNormalizedTags
+    parts.mkString(".")
   }
 
   def hostName: String = ManagementFactory.getRuntimeMXBean.getName.split('@')(1)
@@ -77,8 +78,8 @@ object PercentEncoder {
     encodedString.toString()
   }
 
-  def shouldEncode(ch: Char): Boolean = {
+  private def shouldEncode(ch: Char): Boolean = {
     if (ch > 128 || ch < 0) true
-    else " %$&+,./:;=?@<>#%".indexOf(ch) >= 0;
+    else " %$&+,./:;=?@<>#%".indexOf(ch) >= 0
   }
 }
