@@ -11,18 +11,19 @@ fast with little to no overhead.
 
 ## Getting Started
 
-The `kamon-statsd` module is currently available for Scala 2.10, 2.11 and 2.12.
+The `kamon-statsd` module is currently available for Scala 2.10, 2.11, 2.12 and 2.13.
 
 Supported releases and dependencies are shown below.
 
 | kamon-statsd | status | jdk  | scala
 |:------------:|:------:|:----:|------------------
 |  1.0.0       | stable | 1.8+ | 2.10, 2.11, 2.12
+|  2.0.0       | stable | 1.8+ | 2.11, 2.12, 2.13
 
 To get started with SBT, simply add the following to your `build.sbt` file:
 
 ```scala
-libraryDependencies += "io.kamon" %% "kamon-statsd" % "1.0.0"
+libraryDependencies += "io.kamon" %% "kamon-statsd" % "2.0.0"
 ```
 
 and add the StatsD reporter to Kamon:
